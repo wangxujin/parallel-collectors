@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -45,7 +46,7 @@ abstract class AbstractAsyncUnorderedParallelCollector<T, R, C>
     }
 
     @Override
-    public Function<List<CompletableFuture<R>>, CompletableFuture<C>> finisher() {
+    public Function<List<CompletableFuture<R>>, CompletionStage<C>> finisher() {
         if (!dispatcher.isEmpty()) {
             dispatcher.start();
             return futures -> resultsProcessor()

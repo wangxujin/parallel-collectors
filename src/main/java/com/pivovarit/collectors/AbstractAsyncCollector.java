@@ -3,6 +3,7 @@ package com.pivovarit.collectors;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
@@ -10,7 +11,7 @@ import java.util.stream.Collector;
 /**
  * @author Grzegorz Piwowarek
  */
-abstract class AbstractAsyncCollector<T, R, C> implements Collector<T, List<CompletableFuture<R>>, CompletableFuture<C>> {
+abstract class AbstractAsyncCollector<T, R, C> implements Collector<T, List<CompletableFuture<R>>, CompletionStage<C>> {
 
     @Override
     public Supplier<List<CompletableFuture<R>>> supplier() {

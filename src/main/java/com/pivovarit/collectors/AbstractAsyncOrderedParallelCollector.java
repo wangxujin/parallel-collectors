@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -53,7 +54,7 @@ abstract class AbstractAsyncOrderedParallelCollector<T, R, C>
     }
 
     @Override
-    public Function<List<CompletableFuture<Map.Entry<Integer, R>>>, CompletableFuture<C>> finisher() {
+    public Function<List<CompletableFuture<Map.Entry<Integer, R>>>, CompletionStage<C>> finisher() {
         if (!dispatcher.isEmpty()) {
             dispatcher.start();
             return resultsProcessor()
