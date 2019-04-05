@@ -3,6 +3,7 @@ package com.pivovarit.collectors;
 import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -10,7 +11,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
 import java.util.stream.Stream;
 
 import static java.util.concurrent.CompletableFuture.allOf;
@@ -19,8 +23,7 @@ import static java.util.concurrent.CompletableFuture.allOf;
  * @author Grzegorz Piwowarek
  */
 abstract class AbstractAsyncOrderedParallelCollector<T, R, C>
-  extends AbstractAsyncCollector<T, Map.Entry<Integer, R>, C>
-  implements AutoCloseable {
+  implements Collector<T, List<CompletableFuture<Map.Entry<Integer, R>>>, CompletableFuture<C>>, AutoCloseable {
 
     private final Dispatcher<Map.Entry<Integer, R>> dispatcher;
     private final Function<T, R> function;
@@ -43,6 +46,19 @@ abstract class AbstractAsyncOrderedParallelCollector<T, R, C>
     }
 
     abstract Function<CompletableFuture<Stream<R>>, CompletableFuture<C>> resultsProcessor();
+
+    @Override
+    public Supplier<List<CompletableFuture<Map.Entry<Integer, R>>>> supplier() {
+        return LinkedList::new;
+    }
+
+    @Override
+    public BinaryOperator<List<CompletableFuture<Map.Entry<Integer, R>>>> combiner() {
+        return (left, right) -> {
+            left.addAll(right);
+            return left;
+        };
+    }
 
     @Override
     public BiConsumer<List<CompletableFuture<Map.Entry<Integer, R>>>, T> accumulator() {
@@ -82,5 +98,13 @@ abstract class AbstractAsyncOrderedParallelCollector<T, R, C>
             .map(CompletableFuture::join)
             .sorted(Comparator.comparing(Map.Entry::getKey))
             .map(Map.Entry::getValue));
+    }
+
+    private static <T1> T1 supplyWithResources(Supplier<T1> supplier, Runnable action) {
+        try {
+            return supplier.get();
+        } finally {
+            action.run();
+        }
     }
 }
