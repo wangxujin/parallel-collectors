@@ -24,11 +24,8 @@ class CompletionOrderSpliterator<T> implements Spliterator<T> {
             action.accept(next);
             return true;
         } else {
-            try {
-                return false;
-            } finally {
-                finisher.run();
-            }
+            finisher.run();
+            return false;
         }
     }
 
