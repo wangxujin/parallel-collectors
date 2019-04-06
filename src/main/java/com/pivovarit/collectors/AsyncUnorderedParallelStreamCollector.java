@@ -1,32 +1,82 @@
 package com.pivovarit.collectors;
 
+import java.util.EnumSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author Grzegorz Piwowarek
  */
 final class AsyncUnorderedParallelStreamCollector<T, R>
-  extends AbstractAsyncUnorderedParallelCollector<T, R, Stream<R>>
-  implements AutoCloseable {
+  implements Collector<T, List<CompletableFuture<R>>, Stream<R>>, AutoCloseable {
+
+    private final Dispatcher<R> dispatcher;
+    private final Function<T, R> function;
 
     AsyncUnorderedParallelStreamCollector(
       Function<T, R> function,
       Executor executor,
       int parallelism) {
-        super(function, executor, parallelism);
+        this.dispatcher = new ThrottlingDispatcher<>(executor, parallelism);
+        this.function = function;
     }
 
     AsyncUnorderedParallelStreamCollector(
       Function<T, R> function,
       Executor executor) {
-        super(function, executor);
+        this.dispatcher = new UnboundedDispatcher<>(executor);
+        this.function = function;
     }
 
     @Override
-    Function<CompletableFuture<Stream<R>>, CompletableFuture<Stream<R>>> resultsProcessor() {
-        return result -> result;
+    public void close() {
+        dispatcher.close();
+    }
+
+    @Override
+    public Supplier<List<CompletableFuture<R>>> supplier() {
+        return LinkedList::new;
+    }
+
+    @Override
+    public BiConsumer<List<CompletableFuture<R>>, T> accumulator() {
+        return (acc, e) -> acc.add(dispatcher.enqueue(() -> function.apply(e)));
+    }
+
+    @Override
+    public BinaryOperator<List<CompletableFuture<R>>> combiner() {
+        return (left, right) -> {
+            left.addAll(right);
+            return left;
+        };
+    }
+
+    @Override
+    public Function<List<CompletableFuture<R>>, Stream<R>> finisher() {
+        if (!dispatcher.isEmpty()) {
+            dispatcher.start();
+            return futures -> StreamSupport.stream(new CompletionOrderSpliterator<>(futures, dispatcher::close), false);
+        } else {
+            return futures -> Stream.empty();
+        }
+    }
+
+    @Override
+    public Set<Characteristics> characteristics() {
+        return EnumSet.of(Characteristics.UNORDERED);
     }
 }
